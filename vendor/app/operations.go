@@ -1,4 +1,4 @@
-package lovelio
+package app
 
 import (
 	"bytes"
@@ -22,6 +22,9 @@ func NewBoard(conn redis.Conn, useruuid string) string {
 	var buffer bytes.Buffer
 
 	stringKey, _ := redis.String(conn.Do("HLEN", useruuid))
+	if stringKey == "" {
+		stringKey = "0"
+	}
 
 	buffer.WriteString(useruuid)
 	buffer.WriteString(":")
@@ -34,13 +37,27 @@ func NewBoard(conn redis.Conn, useruuid string) string {
 }
 
 // GetUserBoards returns a map of all user boards
-// a board is defined by a map containing (board_key => name)
+// a board is defined in the user map containing (board_key => name)
 // board_key must be unique
 func GetUserBoards(conn redis.Conn, useruuid string) map[string]string {
 	values, err := redis.StringMap(conn.Do("HGETALL", useruuid))
 
 	if err != nil {
 		var blank map[string]string
+		return blank
+	} else {
+		return values
+	}
+}
+
+// GetBoardItems returns a map of board items
+// a board is a map containing items and incremental counts
+// board_key must be unique
+func GetBoardItems(conn redis.Conn, boardKey string) map[string]int64 {
+	values, err := redis.Int64Map(conn.Do("HGETALL", boardKey))
+
+	if err != nil {
+		var blank map[string]int64
 		return blank
 	} else {
 		return values
@@ -79,7 +96,7 @@ func DecrementBoardItem(conn redis.Conn, boardKey, itemKey string) int64 {
 // no return value
 func RenameBoardItem(conn redis.Conn, boardKey, itemKey, newName string) {
 	currentValue, err := redis.Int64(conn.Do("HGET", boardKey, itemKey))
-	if err != nil {
+	if err == nil {
 		conn.Do("HSET", boardKey, newName, currentValue)
 		conn.Do("HDEL", boardKey, itemKey)
 	}
