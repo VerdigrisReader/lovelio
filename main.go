@@ -2,10 +2,10 @@ package main
 
 import (
 	"app"
-	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/pat"
 	"github.com/urfave/negroni"
+	"html/template"
 	"log"
 	"net/http"
 	"os"
@@ -28,18 +28,34 @@ func newPool(addr string) *redis.Pool {
 // Request handlers
 // Home handler serves the main page
 func homeHandler(wr http.ResponseWriter, req *http.Request) {
+	// Get userid
 	var userId string
 	userIdCookie, err := req.Cookie("loveliouid")
-	// User hasn't got cookie set
-	if err != nil {
-		wr.WriteHeader(http.StatusOK)
-		fmt.Fprintf(wr, "You haven't got a cookie")
-		_ = userIdCookie
-	} else {
-		userId = userIdCookie.Value
-		wr.WriteHeader(http.StatusOK)
-		fmt.Fprintf(wr, "You have an old cookie %s", userId)
+	userId = userIdCookie.Value
+
+	// Get boards
+	conn := pool.Get()
+	defer conn.Close()
+	boardNames := app.GetUserBoards(conn, userId)
+
+	type Renderable struct {
+		UserId     string
+		BoardNames map[string]string
 	}
+	var render Renderable = Renderable{
+		userId,
+		boardNames,
+	}
+
+	tmpl, err := template.ParseFiles("templates/index.html")
+	if err != nil {
+		http.Error(wr, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := tmpl.Execute(wr, render); err != nil {
+		http.Error(wr, err.Error(), http.StatusInternalServerError)
+	}
+
 }
 
 // This handles the case where a userid (uuid) is passed as the url
@@ -47,6 +63,7 @@ func homeHandler(wr http.ResponseWriter, req *http.Request) {
 func userIdHandler(wr http.ResponseWriter, req *http.Request) {
 	userId := req.URL.Query().Get(":userid")
 	conn := pool.Get()
+	defer conn.Close()
 	exists, _ := redis.Bool(conn.Do("EXISTS", userId))
 	if exists {
 		newCookie := &http.Cookie{
@@ -80,6 +97,7 @@ func UserIdCookieMiddleware(wr http.ResponseWriter, req *http.Request, next http
 	if err != nil {
 		// New user created
 		conn := pool.Get()
+		defer conn.Close()
 		userId = app.NewUser(conn)
 		app.NewBoard(conn, userId)
 		newCookie := &http.Cookie{
