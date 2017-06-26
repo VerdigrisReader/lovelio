@@ -106,6 +106,7 @@ func UserIdCookieMiddleware(wr http.ResponseWriter, req *http.Request, next http
 			MaxAge: 0,
 		}
 		http.SetCookie(wr, newCookie)
+		req.AddCookie(newCookie)
 	}
 	next(wr, req)
 }
