@@ -2,6 +2,7 @@ package main
 
 import (
 	"app"
+	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/pat"
 	"github.com/gorilla/websocket"
@@ -41,7 +42,7 @@ func homeHandler(wr http.ResponseWriter, req *http.Request) {
 
 	type Renderable struct {
 		UserId     string
-		BoardNames map[string]string
+		BoardNames []app.BoardName
 	}
 	var render Renderable = Renderable{
 		userId,
@@ -94,18 +95,39 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
+type Message struct {
+	MessageType string      `json:"type"`
+	Body        interface{} `json:"body"`
+}
+
 func websocketHandler(wr http.ResponseWriter, req *http.Request) {
 	sock, _ := upgrader.Upgrade(wr, req, nil)
 	userIdCookie, _ := req.Cookie("loveliouid")
 	userId := userIdCookie.Value
 	conn := pool.Get()
-	defer conn.Close()
 
 	boards := app.GetUserBoards(conn, userId)
-	for board, _ := range boards {
-		boardInfo := app.GetBoardItems(conn, board)
-		sock.WriteJSON(boardInfo)
-	}
+	board := boards[0]
+	boardInfo := app.GetBoardItems(conn, board.BoardId)
+	message := Message{"BoardItems", boardInfo}
+	sock.WriteJSON(message)
+
+	go func() {
+		for {
+			var msg Message
+			err := sock.ReadJSON(&msg)
+			if err != nil {
+				return
+			}
+			switch msg.MessageType {
+			case "newBoard":
+				fmt.Print("New board")
+				boardInfo := app.NewBoard(conn, userId)
+				var reply = Message{"NewBoard", boardInfo}
+				sock.WriteJSON(reply)
+			}
+		}
+	}()
 }
 
 // Middlewares
