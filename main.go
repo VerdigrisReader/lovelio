@@ -4,6 +4,7 @@ import (
 	"app"
 	"github.com/garyburd/redigo/redis"
 	"github.com/gorilla/pat"
+	"github.com/gorilla/websocket"
 	"github.com/urfave/negroni"
 	"html/template"
 	"log"
@@ -88,6 +89,19 @@ func forgetHandler(wr http.ResponseWriter, req *http.Request) {
 	http.Redirect(wr, req, "/", 302)
 }
 
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+}
+
+func websocketHandler(wr http.ResponseWriter, req *http.Request) {
+	conn, err := upgrader.Upgrade(wr, req, nil)
+	if err != nil {
+	}
+	_ = conn
+	conn.WriteMessage(1, []byte("Message"))
+}
+
 // Middlewares
 // UserIdCookieMiddleware guarantees that the user's request will have their ID attached as a cookie
 // secure no?
@@ -129,6 +143,7 @@ func main() {
 	router := pat.New()
 
 	router.Get("/forget", forgetHandler)
+	router.Get("/ws", websocketHandler)
 	router.Get("/{userid:[\\w-]{36}}", userIdHandler)
 	router.Get("/", homeHandler)
 
