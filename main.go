@@ -95,11 +95,17 @@ var upgrader = websocket.Upgrader{
 }
 
 func websocketHandler(wr http.ResponseWriter, req *http.Request) {
-	conn, err := upgrader.Upgrade(wr, req, nil)
-	if err != nil {
+	sock, _ := upgrader.Upgrade(wr, req, nil)
+	userIdCookie, _ := req.Cookie("loveliouid")
+	userId := userIdCookie.Value
+	conn := pool.Get()
+	defer conn.Close()
+
+	boards := app.GetUserBoards(conn, userId)
+	for board, _ := range boards {
+		boardInfo := app.GetBoardItems(conn, board)
+		sock.WriteJSON(boardInfo)
 	}
-	_ = conn
-	conn.WriteMessage(1, []byte("Message"))
 }
 
 // Middlewares
