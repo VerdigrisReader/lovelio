@@ -12,7 +12,6 @@ $(document).ready(function() {
 
     Socket.onmessage = function(event) {
         message = JSON.parse(event.data)
-        console.log(message)
         switch(message.type) {
             case 'getBoardItems':
                 renderBoard(message.body)
@@ -34,16 +33,32 @@ $(document).ready(function() {
         currentBoard = boardId
     }
 
-    mutateItem = function(name, i) {
+    mutateItem = function(element, command) {
+        name = $(element).parent("div.row").attr("name")
         message = {
             "type": 'mutateItem',
             "body": {
                 "boardId": currentBoard,
                 "itemName": name,
-                "delta": i
+                "delta": command
             }
         }
+        if (command === "incr") {
+            prev = $(element).prev();
+            if (prev.hasClass("box")) {
+                prev.clone(withDataAndEvents=true).insertAfter(prev)
+            } else {
+                prev = $(element);
+                prev.clone(withDataAndEvents=true).insertAfter(prev)
+            }
         Socket.send(JSON.stringify(message))
+        } else {
+            next = $(element).next()
+            if (next.hasClass("box")) {
+                next.remove()
+                Socket.send(JSON.stringify(message))
+            }
+        }
     }
 
     renderBoard = function(boardItems) {
@@ -64,14 +79,16 @@ $(document).ready(function() {
             $("<a/>").addClass("minus")
                 .appendTo(newMinus)
             newMinus.click(function() {
-                mutateItem(item.name, 'decr')
-                console.log('minus')
+                mutateItem(this, 'decr')
             })
             for (j = 0; j < item.value; j++) {
                 newBox = $('<div/>')
                     .addClass('box')
                     .addClass('c' + (i % 5))
-                    .appendTo(newRow);
+                    .appendTo(newRow)
+                    .click(function() {
+                        mutateItem(this, 'incr')
+                    });
             }
             newPlus = $('<div/>')
                 .addClass("button")
@@ -79,8 +96,7 @@ $(document).ready(function() {
             $('<a/>').addClass("plus")
                 .appendTo(newPlus);
             newPlus.click(function() {
-                mutateItem(item.name, 'incr')
-                console.log('plus')
+                mutateItem(this, 'incr')
             })
         }
     }

@@ -105,14 +105,23 @@ func RenameBoard(conn redis.Conn, useruuid, BoardId, newName string) {
 // If the item doesn't exist the value is set to 1, so this can be used to create a new item
 // Returns incremented key
 func IncrementBoardItem(conn redis.Conn, BoardId, itemKey string) int64 {
-	newValue, _ := redis.Int64(conn.Do("HINCRBY", BoardId, itemKey, 1))
-	return newValue
+	exists, _ := redis.Bool(conn.Do("HEXISTS", BoardId, itemKey))
+	if exists {
+		newValue, _ := redis.Int64(conn.Do("HINCRBY", BoardId, itemKey, 1))
+		return newValue
+	} else {
+		return 0
+	}
 }
 
 // DecrementBoardItem decreases the key by 1
 // If the item doesn't exist the value is set to 1, so this can be used to create a new item
 // Returns decremented key (must be >= 0)
 func DecrementBoardItem(conn redis.Conn, BoardId, itemKey string) int64 {
+	exists, _ := redis.Bool(conn.Do("HEXISTS", BoardId, itemKey))
+	if !(exists) {
+		return 0
+	}
 	newValue, _ := redis.Int64(conn.Do("HINCRBY", BoardId, itemKey, -1))
 	if newValue < 0 {
 		conn.Do("HSET", BoardId, itemKey, 0)
