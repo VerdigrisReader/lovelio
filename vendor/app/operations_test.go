@@ -28,11 +28,11 @@ func TestNewBoard(t *testing.T) {
 	addBoard := conn.Command("HSET", TEST_UUID, expected_key, "new")
 	addFirstKey := conn.Command("HSET", expected_key, "new", 0)
 
-	newBoardKey := NewBoard(conn, TEST_UUID)
+	newBoardName := NewBoard(conn, TEST_UUID)
 
 	// Assert that index is concatenated
-	if newBoardKey != expected_key {
-		t.Errorf("Board key is not valid: %s", newBoardKey)
+	if newBoardName.BoardId != expected_key {
+		t.Errorf("Board key is not valid: %s", newBoardName.BoardId)
 	}
 	// Assert len is called
 	if conn.Stats(cmd) != 1 {
@@ -52,8 +52,7 @@ func TestGetUserBoards(t *testing.T) {
 		"key": "value",
 	})
 
-	var all_boards map[string]string
-	all_boards = GetUserBoards(conn, TEST_UUID)
+	all_boards := GetUserBoards(conn, TEST_UUID)
 
 	if len(all_boards) != 1 {
 		t.Errorf("Expected map with 1 value, got %s", all_boards)
@@ -71,8 +70,7 @@ func TestGetBoardItems(t *testing.T) {
 		"brey": "263",
 	})
 
-	var all_items map[string]int64
-	all_items = GetBoardItems(conn, TEST_UUID)
+	all_items := GetBoardItems(conn, TEST_UUID)
 
 	if len(all_items) != 2 {
 		t.Errorf("Expected map with 2 values, got %s", all_items)
