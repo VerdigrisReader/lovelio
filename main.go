@@ -112,30 +112,25 @@ func websocketHandler(wr http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				return
 			}
+			conn := pool.Get()
+			defer conn.Close()
 			switch msg.MessageType {
 			case "newBoard":
-				conn := pool.Get()
-				defer conn.Close()
 				fmt.Print("New board")
 				boardInfo := app.NewBoard(conn, userId)
 				var reply = Message{"NewBoard", boardInfo}
 				sock.WriteJSON(reply)
 			case "getBoardItems":
-				conn := pool.Get()
-				defer conn.Close()
 				body, _ := msg.Body.(map[string]interface{})
 				boardId, _ := body["boardId"].(string)
 				boardItems := app.GetBoardItems(conn, boardId)
 				var reply = Message{"getBoardItems", boardItems}
 				sock.WriteJSON(reply)
 			case "mutateItem":
-				conn := pool.Get()
-				defer conn.Close()
 				body, _ := msg.Body.(map[string]interface{})
 				boardId, _ := body["boardId"].(string)
 				itemName, _ := body["itemName"].(string)
 				delta, _ := body["delta"].(string)
-				fmt.Printf("delta %v\n", delta)
 				if delta == "incr" {
 					app.IncrementBoardItem(conn, boardId, itemName)
 				} else {

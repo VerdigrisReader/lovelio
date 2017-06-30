@@ -1,22 +1,32 @@
+var Socket
 var newBoard = function(){};
-var currentBoard = '' 
+var currentBoard
 
 $(document).ready(function() {
-    var Socket = new WebSocket("ws://localhost:3000/ws");
+    function socketConnect() {
+        Socket = new WebSocket("ws://localhost:3000/ws");
 
-    Socket.onopen = function (event) {
-        boardId = $("li.menuitem")[0].id
-        currentBoard = boardId
-        showBoard(boardId)
-    }
+        Socket.onopen = function (event) {
+            if (!currentBoard) {
+                boardId = $("li.menuitem")[0].id
+                currentBoard = boardId
+                showBoard(boardId)
+            }
+        }
 
-    Socket.onmessage = function(event) {
-        message = JSON.parse(event.data)
-        switch(message.type) {
-            case 'getBoardItems':
-                renderBoard(message.body)
+        Socket.onmessage = function(event) {
+            message = JSON.parse(event.data)
+            switch(message.type) {
+                case 'getBoardItems':
+                    renderBoard(message.body)
+            }
+        }
+
+        Socket.onclose = function(event) {
+            setTimeout(function(){socketConnect()}, 5000);
         }
     }
+    socketConnect()
 
     newBoard = function() {
         Socket.send(JSON.stringify({"type": "newBoard"}))
@@ -44,14 +54,11 @@ $(document).ready(function() {
             }
         }
         if (command === "incr") {
-            prev = $(element).prev();
-            if (prev.hasClass("box")) {
-                prev.clone(withDataAndEvents=true).insertAfter(prev)
-            } else {
-                prev = $(element);
-                prev.clone(withDataAndEvents=true).insertAfter(prev)
-            }
-        Socket.send(JSON.stringify(message))
+            elem = $(element).parent("div.row");
+            elem.data("proto")
+                .clone(withDataAndEvents=true)
+                .insertBefore($(element))
+            Socket.send(JSON.stringify(message))
         } else {
             next = $(element).next()
             if (next.hasClass("box")) {
@@ -70,6 +77,14 @@ $(document).ready(function() {
                 .addClass("row")
                 .attr('name', item.name)
                 .appendTo(main);
+
+            proto = $('<div/>')
+                .addClass('box')
+                .addClass('c' + (i % 5))
+                .click(function() {
+                    mutateItem(this, 'incr')
+                });
+            newRow.data("proto", proto)
             $('<div/>').addClass("title")
                 .text(item.name)
                 .appendTo(newRow);
@@ -82,13 +97,9 @@ $(document).ready(function() {
                 mutateItem(this, 'decr')
             })
             for (j = 0; j < item.value; j++) {
-                newBox = $('<div/>')
-                    .addClass('box')
-                    .addClass('c' + (i % 5))
+                newRow.data("proto")
+                    .clone(withDataAndEvents=true)
                     .appendTo(newRow)
-                    .click(function() {
-                        mutateItem(this, 'incr')
-                    });
             }
             newPlus = $('<div/>')
                 .addClass("button")
