@@ -31,6 +31,7 @@ section {
 }
 .row {
     clear: left;
+    display: table;
 }
 .box {
     float: left;
@@ -38,6 +39,43 @@ section {
     height: 28px;
     margin: 2px;
     clear: none;
+}
+.button {
+    float: left;
+    width: 28px;
+    height: 28px;
+    margin: 2px;
+    clear: none;
+    color: black;
+    opacity: 0.1;
+}
+.button a {
+    display: block;
+    color: black;
+    padding: 8px 8px;
+    text-decoration: none;
+
+}
+.button:hover {
+    background: cornflowerblue;
+    opacity: 0.3;
+    color: white;
+}
+.minus:before {
+    font-family: FontAwesome;
+    content: "\f068";
+}
+.plus:before {
+    font-family: FontAwesome;
+    content: "\f067";
+}
+.title {
+    float: left;
+    height: 28px;
+    width: 70px;
+    margin: 2px;
+    clear: none;
+    display: table-cell;
 }
 h2 {
     clear: both;

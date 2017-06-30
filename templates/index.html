@@ -13,7 +13,7 @@
         <ul>
             <li><b><a href="/">lovel.io</a></b></li>
             {{ range $board := .BoardNames }}
-            <li><a href="javascript:showBoard('{{ $board.BoardId }}')">{{ $board.Name }}</a></li>
+            <li class="menuitem" id="{{ $board.BoardId }}"><a href="javascript:showBoard('{{ $board.BoardId }}')">{{ $board.Name }}</a></li>
             {{ end }}
             <li><a href="javascript:newBoard()"><i class="fa fa-plus" aria-hidden="true"></i></a></li>
         </ul>

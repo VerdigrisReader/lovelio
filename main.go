@@ -104,13 +104,6 @@ func websocketHandler(wr http.ResponseWriter, req *http.Request) {
 	sock, _ := upgrader.Upgrade(wr, req, nil)
 	userIdCookie, _ := req.Cookie("loveliouid")
 	userId := userIdCookie.Value
-	conn := pool.Get()
-
-	boards := app.GetUserBoards(conn, userId)
-	board := boards[0]
-	boardInfo := app.GetBoardItems(conn, board.BoardId)
-	message := Message{"BoardItems", boardInfo}
-	sock.WriteJSON(message)
 
 	go func() {
 		for {
@@ -121,11 +114,35 @@ func websocketHandler(wr http.ResponseWriter, req *http.Request) {
 			}
 			switch msg.MessageType {
 			case "newBoard":
+				conn := pool.Get()
+				defer conn.Close()
 				fmt.Print("New board")
 				boardInfo := app.NewBoard(conn, userId)
 				var reply = Message{"NewBoard", boardInfo}
 				sock.WriteJSON(reply)
+			case "getBoardItems":
+				conn := pool.Get()
+				defer conn.Close()
+				body, _ := msg.Body.(map[string]interface{})
+				boardId, _ := body["boardId"].(string)
+				boardItems := app.GetBoardItems(conn, boardId)
+				var reply = Message{"getBoardItems", boardItems}
+				sock.WriteJSON(reply)
+			case "mutateItem":
+				conn := pool.Get()
+				defer conn.Close()
+				body, _ := msg.Body.(map[string]interface{})
+				boardId, _ := body["boardId"].(string)
+				itemName, _ := body["itemName"].(string)
+				delta, _ := body["delta"].(string)
+				fmt.Printf("delta %v\n", delta)
+				if delta == "incr" {
+					app.IncrementBoardItem(conn, boardId, itemName)
+				} else {
+					app.DecrementBoardItem(conn, boardId, itemName)
+				}
 			}
+
 		}
 	}()
 }

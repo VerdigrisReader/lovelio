@@ -1,19 +1,88 @@
-var Socket = new WebSocket("ws://localhost:3000/ws");
+var newBoard = function(){};
+var currentBoard = '' 
 
-Socket.onopen = function (event) {
-}
+$(document).ready(function() {
+    var Socket = new WebSocket("ws://localhost:3000/ws");
 
-Socket.onmessage = function(event) {
-    message = event.data
-    console.log(message)
-    switch(message.type) {
-        case "boardData":
-            break;
-        case "boardChange":
-            break;
+    Socket.onopen = function (event) {
+        boardId = $("li.menuitem")[0].id
+        currentBoard = boardId
+        showBoard(boardId)
+    }
+
+    Socket.onmessage = function(event) {
+        message = JSON.parse(event.data)
+        console.log(message)
+        switch(message.type) {
+            case 'getBoardItems':
+                renderBoard(message.body)
+        }
+    }
+
+    newBoard = function() {
+        Socket.send(JSON.stringify({"type": "newBoard"}))
+    }
+
+    // This sends a ws request which returns 'getBoardItems'
+    // in the onmessage getBoardItems causes the screen to be re-rendered
+    showBoard = function(boardId) {
+        message = {
+            "type": "getBoardItems",
+            "body": {"boardId": boardId}
+        }
+        Socket.send(JSON.stringify(message))
+        currentBoard = boardId
+    }
+
+    mutateItem = function(name, i) {
+        message = {
+            "type": 'mutateItem',
+            "body": {
+                "boardId": currentBoard,
+                "itemName": name,
+                "delta": i
+            }
+        }
+        Socket.send(JSON.stringify(message))
+    }
+
+    renderBoard = function(boardItems) {
+        main = $("div.main")
+        main.empty()
+        for (i = 0; i < boardItems.length; i++) {
+            item = boardItems[i]
+            newRow = $('<div/>')
+                .addClass("row")
+                .attr('name', item.name)
+                .appendTo(main);
+            $('<div/>').addClass("title")
+                .text(item.name)
+                .appendTo(newRow);
+            newMinus = $('<div/>')
+                .addClass("button")
+                .appendTo(newRow);
+            $("<a/>").addClass("minus")
+                .appendTo(newMinus)
+            newMinus.click(function() {
+                mutateItem(item.name, 'decr')
+                console.log('minus')
+            })
+            for (j = 0; j < item.value; j++) {
+                newBox = $('<div/>')
+                    .addClass('box')
+                    .addClass('c' + (i % 5))
+                    .appendTo(newRow);
+            }
+            newPlus = $('<div/>')
+                .addClass("button")
+                .appendTo(newRow);
+            $('<a/>').addClass("plus")
+                .appendTo(newPlus);
+            newPlus.click(function() {
+                mutateItem(item.name, 'incr')
+                console.log('plus')
+            })
+        }
     }
 }
-
-function newBoard() {
-    Socket.send(JSON.stringify({"type": "newBoard"}))
-}
+)
