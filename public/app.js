@@ -1,8 +1,8 @@
 var Socket
-var newBoard = function(){};
 var currentBoard
 
 $(document).ready(function() {
+    // Connect to websocket and define message actions
     function socketConnect() {
         Socket = new WebSocket("ws://localhost:3000/ws");
 
@@ -19,6 +19,9 @@ $(document).ready(function() {
             switch(message.type) {
                 case 'getBoardItems':
                     renderBoard(message.body)
+                    break
+                case 'newBoard':
+                    addMenuItem(message.body.name, message.body.board_id)
             }
         }
 
@@ -28,13 +31,45 @@ $(document).ready(function() {
     }
     socketConnect()
 
-    newBoard = function() {
-        Socket.send(JSON.stringify({"type": "newBoard"}))
+    // Add some onclicks to buttons
+    $(".menuitem").click(function() {
+        showBoard(this.id)
+    })
+
+    $(".newboard > a").click(function() {
+        $(".newboard > .popup").toggle();
+        $(".popup > input").focus();
+    })
+    $(".newboard > .popup").keyup(function(event) {
+        if(event.keyCode == 13){
+            name = $(".popup > input").val();
+            if (name) {
+                newBoard(name);
+                $(".popup > input").val("");
+                $(".newboard > .popup").toggle();
+
+            } else {
+                return
+            }
+        }
+    })
+
+    function newBoard(name) {
+        Socket.send(JSON.stringify({"type": "newBoard", "body":{"name": name}}))
+    }
+
+    function addMenuItem(name, id) {
+        newItem = $("<li/>")
+            .addClass("menuitem")
+            .attr("id", id);
+        $("<a/>").text(name)
+            .appendTo(newItem)
+        newItem.insertBefore($(".newboard"))
     }
 
     // This sends a ws request which returns 'getBoardItems'
     // in the onmessage getBoardItems causes the screen to be re-rendered
-    showBoard = function(boardId) {
+    function showBoard(boardId) {
         message = {
             "type": "getBoardItems",
             "body": {"boardId": boardId}
@@ -43,7 +78,7 @@ $(document).ready(function() {
         currentBoard = boardId
     }
 
-    mutateItem = function(element, command) {
+    function mutateItem(element, command) {
         name = $(element).parent("div.row").attr("name")
         message = {
             "type": 'mutateItem',

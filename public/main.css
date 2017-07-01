@@ -53,7 +53,6 @@ section {
     display: block;
     padding: 8px 8px;
     text-decoration: none;
-
 }
 .button:hover {
     background: gray;
@@ -92,6 +91,9 @@ ul {
 li {
     float: left;
 }
+nav ul li:hover {
+    cursor: pointer;
+}
 li a {
     display: block;
     color: white;
@@ -102,4 +104,16 @@ li a {
 /* Change the link color to #111 (black) on hover */
 li a:hover {
     background-color: #555;
+}
+.popup {
+    display: none;
+    width: 160px;
+    background-color: #555;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 8px 0;
+    position: absolute;
+    z-index: 1;
+    margin-left: -80px;
 }

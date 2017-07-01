@@ -123,9 +123,10 @@ func websocketHandler(wr http.ResponseWriter, req *http.Request) {
 			defer conn.Close()
 			switch msg.MessageType {
 			case "newBoard":
-				fmt.Print("New board")
-				boardInfo := app.NewBoard(conn, userId)
-				var reply = Message{"NewBoard", boardInfo}
+				body, _ := msg.Body.(map[string]interface{})
+				boardName, _ := body["name"].(string)
+				boardInfo := app.NewBoard(conn, userId, boardName)
+				var reply = Message{"newBoard", boardInfo}
 				sock.WriteJSON(reply)
 			case "getBoardItems":
 				body, _ := msg.Body.(map[string]interface{})
@@ -170,7 +171,7 @@ func UserIdCookieMiddleware(wr http.ResponseWriter, req *http.Request, next http
 		conn := pool.Get()
 		defer conn.Close()
 		userId = app.NewUser(conn)
-		app.NewBoard(conn, userId)
+		app.NewBoard(conn, userId, "new")
 		newCookie := &http.Cookie{
 			Name:   "loveliouid",
 			Value:  userId,

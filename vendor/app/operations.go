@@ -51,7 +51,7 @@ func stringAppend(key, suffix string) string {
 // NewBoard creates a new board for the user
 // A board is referenced in the user's Hash by (board_key str => name str)
 // A board is a hash containing (name str => count int)
-func NewBoard(conn redis.Conn, useruuid string) BoardName {
+func NewBoard(conn redis.Conn, useruuid, boardName string) BoardName {
 	newUUID := uuid.New().String()
 	boardId := stringAppend("board:", newUUID)
 	boardItemsId := stringAppend(boardId, ":items")
@@ -59,7 +59,7 @@ func NewBoard(conn redis.Conn, useruuid string) BoardName {
 	conn.Send("RPUSH", useruuid, boardId)
 
 	// Assign name to board struct
-	conn.Send("HSET", boardId, "name", "new")
+	conn.Send("HSET", boardId, "name", boardName)
 	conn.Send("HSET", boardId, "itemsId", boardItemsId)
 	// Add first member to boardItems sortedset
 	conn.Send("ZADD", boardItemsId, 0, "new")
@@ -67,7 +67,21 @@ func NewBoard(conn redis.Conn, useruuid string) BoardName {
 	if err != nil {
 		panic(err)
 	}
-	return BoardName{boardId, "new"}
+	return BoardName{boardId, boardName}
+}
+
+func getManyBoards(conn redis.Conn, keys ...string) []BoardName {
+	var boards []BoardName
+
+	for _, key := range keys {
+		conn.Send("HGET", key, "name")
+	}
+	conn.Flush()
+	for _, key := range keys {
+		name, _ := redis.String(conn.Receive())
+		boards = append(boards, BoardName{key, name})
+	}
+	return boards
 }
 
 // GetUserBoards returns a map of all user boards
@@ -80,15 +94,7 @@ func GetUserBoards(conn redis.Conn, useruuid string) []BoardName {
 	if err != nil {
 		return boards
 	} else {
-		for _, key := range values {
-			conn.Send("HGET", key, "name")
-		}
-		conn.Flush()
-		for _, key := range values {
-			name, _ := redis.String(conn.Receive())
-			boards = append(boards, BoardName{key, name})
-		}
-		return boards
+		return getManyBoards(conn, values...)
 	}
 }
 
