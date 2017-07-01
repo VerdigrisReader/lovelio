@@ -27,7 +27,7 @@ func newPool(addr string) *redis.Pool {
 	}
 }
 
-// Request handlers
+// HTTP Request handlers
 // Home handler serves the main page
 func homeHandler(wr http.ResponseWriter, req *http.Request) {
 	// Get userid
@@ -78,6 +78,11 @@ func userIdHandler(wr http.ResponseWriter, req *http.Request) {
 	http.Redirect(wr, req, "/", 302)
 }
 
+func healthHandler(wr http.ResponseWriter, req *http.Request) {
+	wr.WriteHeader(200)
+	wr.Write([]byte("ok"))
+}
+
 // This deletes the userid cookie and redirects to the homepage
 // Mostly for testing etc
 func forgetHandler(wr http.ResponseWriter, req *http.Request) {
@@ -90,6 +95,7 @@ func forgetHandler(wr http.ResponseWriter, req *http.Request) {
 	http.Redirect(wr, req, "/", 302)
 }
 
+// Websocket stuff
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
@@ -146,6 +152,16 @@ func websocketHandler(wr http.ResponseWriter, req *http.Request) {
 // UserIdCookieMiddleware guarantees that the user's request will have their ID attached as a cookie
 // secure no?
 func UserIdCookieMiddleware(wr http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
+	// Map containing exceptions that don't require stupid cookie auth
+	// like a healthcheck endpoint
+	var exceptions = map[string]bool{
+		"/health": true,
+	}
+	_, ok := exceptions[req.URL.Path]
+	if ok {
+		next(wr, req)
+		return
+	}
 	var userId string
 	_, err := req.Cookie("loveliouid")
 	if err != nil {
@@ -182,6 +198,7 @@ func main() {
 	// Define router and routings
 	router := pat.New()
 
+	router.Get("/health", healthHandler)
 	router.Get("/forget", forgetHandler)
 	router.Get("/ws", websocketHandler)
 	router.Get("/{userid:[\\w-]{36}}", userIdHandler)
