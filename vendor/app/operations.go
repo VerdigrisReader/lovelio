@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"github.com/garyburd/redigo/redis"
 	"github.com/google/uuid"
-	"strconv"
 )
 
 // Types
@@ -32,45 +31,61 @@ type BoardList struct {
 // The user will eventualy be represented by a hash containing name and ID for each board
 // It returns the uuid for the created user
 func NewUser(conn redis.Conn) string {
+	var buffer bytes.Buffer
+
 	user := uuid.New()
 	useruuid := user.String()
-	return useruuid
+
+	buffer.WriteString("user:")
+	buffer.WriteString(useruuid)
+	return buffer.String()
+}
+
+func stringAppend(key, suffix string) string {
+	var buffer bytes.Buffer
+	buffer.WriteString(key)
+	buffer.WriteString(suffix)
+	return buffer.String()
 }
 
 // NewBoard creates a new board for the user
 // A board is referenced in the user's Hash by (board_key str => name str)
 // A board is a hash containing (name str => count int)
 func NewBoard(conn redis.Conn, useruuid string) BoardName {
-	var buffer bytes.Buffer
+	newUUID := uuid.New().String()
+	boardId := stringAppend("board:", newUUID)
+	boardItemsId := stringAppend(boardId, ":items")
 
-	count, _ := redis.Int64(conn.Do("HLEN", useruuid))
-	stringKey := strconv.Itoa(int(count))
+	conn.Send("RPUSH", useruuid, boardId)
 
-	buffer.WriteString(useruuid)
-	buffer.WriteString(":")
-	buffer.WriteString(stringKey)
-	BoardId := buffer.String()
-
-	_, err := conn.Do("HSET", useruuid, BoardId, "new")
+	// Assign name to board struct
+	conn.Send("HSET", boardId, "name", "new")
+	conn.Send("HSET", boardId, "itemsId", boardItemsId)
+	// Add first member to boardItems sortedset
+	conn.Send("ZADD", boardItemsId, 0, "new")
+	err := conn.Flush()
 	if err != nil {
 		panic(err)
 	}
-
-	conn.Do("HSET", BoardId, "new", 0)
-	return BoardName{BoardId, "new"}
+	return BoardName{boardId, "new"}
 }
 
 // GetUserBoards returns a map of all user boards
 // a board is defined in the user map containing (board_key => name)
 // board_key must be unique
 func GetUserBoards(conn redis.Conn, useruuid string) []BoardName {
-	values, err := redis.StringMap(conn.Do("HGETALL", useruuid))
+	values, err := redis.Strings(conn.Do("LRANGE", useruuid, 0, -1))
 	var boards []BoardName
 
 	if err != nil {
 		return boards
 	} else {
-		for key, name := range values {
+		for _, key := range values {
+			conn.Send("HGET", key, "name")
+		}
+		conn.Flush()
+		for _, key := range values {
+			name, _ := redis.String(conn.Receive())
 			boards = append(boards, BoardName{key, name})
 		}
 		return boards
@@ -80,8 +95,9 @@ func GetUserBoards(conn redis.Conn, useruuid string) []BoardName {
 // GetBoardItems returns a map of board items
 // a board is a map containing items and incremental counts
 // board_key must be unique
-func GetBoardItems(conn redis.Conn, BoardId string) []BoardItem {
-	values, err := redis.Int64Map(conn.Do("HGETALL", BoardId))
+func GetBoardItems(conn redis.Conn, boardId string) []BoardItem {
+	itemsId := stringAppend(boardId, ":items")
+	values, err := redis.Int64Map(conn.Do("ZRANGE", itemsId, 0, -1, "WITHSCORES"))
 	var items []BoardItem
 
 	if err != nil {
@@ -97,34 +113,33 @@ func GetBoardItems(conn redis.Conn, BoardId string) []BoardItem {
 // RenameBoard, Given a BoardId and new name, renames the board to the passed value
 // key must already exist
 // Names can collide or be set multiple times
-func RenameBoard(conn redis.Conn, useruuid, BoardId, newName string) {
-	conn.Do("HSET", useruuid, BoardId, newName)
+func RenameBoard(conn redis.Conn, boardId, newName string) {
+	conn.Do("HSET", boardId, "name", newName)
 }
 
 // IncrementBoardItem increases the key by 1
 // If the item doesn't exist the value is set to 1, so this can be used to create a new item
 // Returns incremented key
-func IncrementBoardItem(conn redis.Conn, BoardId, itemKey string) int64 {
-	exists, _ := redis.Bool(conn.Do("HEXISTS", BoardId, itemKey))
-	if exists {
-		newValue, _ := redis.Int64(conn.Do("HINCRBY", BoardId, itemKey, 1))
-		return newValue
-	} else {
-		return 0
+func IncrementBoardItem(conn redis.Conn, boardId, itemKey string) int64 {
+	itemsId := stringAppend(boardId, ":items")
+	newValue, err := redis.Int64(conn.Do("ZINCRBY", itemsId, 1, itemKey))
+	if err != nil {
+		panic(err)
 	}
+	return newValue
 }
 
 // DecrementBoardItem decreases the key by 1
 // If the item doesn't exist the value is set to 1, so this can be used to create a new item
 // Returns decremented key (must be >= 0)
-func DecrementBoardItem(conn redis.Conn, BoardId, itemKey string) int64 {
-	exists, _ := redis.Bool(conn.Do("HEXISTS", BoardId, itemKey))
-	if !(exists) {
-		return 0
+func DecrementBoardItem(conn redis.Conn, boardId, itemKey string) int64 {
+	itemsId := stringAppend(boardId, ":items")
+	newValue, err := redis.Int64(conn.Do("ZINCRBY", itemsId, -1, itemKey))
+	if err != nil {
+		panic(err)
 	}
-	newValue, _ := redis.Int64(conn.Do("HINCRBY", BoardId, itemKey, -1))
 	if newValue < 0 {
-		conn.Do("HSET", BoardId, itemKey, 0)
+		conn.Do("ZADD", itemsId, 0, itemKey)
 		return 0
 	} else {
 		return newValue
@@ -133,10 +148,11 @@ func DecrementBoardItem(conn redis.Conn, BoardId, itemKey string) int64 {
 
 // RenameBoardItem moves the value of an existing board item to a new name within the hash
 // no return value
-func RenameBoardItem(conn redis.Conn, BoardId, itemKey, newName string) {
-	currentValue, err := redis.Int64(conn.Do("HGET", BoardId, itemKey))
+func RenameBoardItem(conn redis.Conn, boardId, itemKey, newName string) {
+	itemsId := stringAppend(boardId, ":items")
+	currentValue, err := redis.Int64(conn.Do("ZSCORE", itemsId, itemKey))
 	if err == nil {
-		conn.Do("HSET", BoardId, newName, currentValue)
-		conn.Do("HDEL", BoardId, itemKey)
+		conn.Do("ZADD", itemsId, newName, currentValue)
+		conn.Do("ZREM", itemsId, itemKey)
 	}
 }

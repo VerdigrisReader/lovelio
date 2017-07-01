@@ -64,6 +64,7 @@ func homeHandler(wr http.ResponseWriter, req *http.Request) {
 // If the uuid exists, it is set as the userid cookie and redirects to the frontpage
 func userIdHandler(wr http.ResponseWriter, req *http.Request) {
 	userId := req.URL.Query().Get(":userid")
+	fmt.Sprintf("userid %v", userId)
 	conn := pool.Get()
 	defer conn.Close()
 	exists, _ := redis.Bool(conn.Do("EXISTS", userId))
@@ -200,8 +201,8 @@ func main() {
 
 	router.Get("/health", healthHandler)
 	router.Get("/forget", forgetHandler)
-	router.Get("/ws", websocketHandler)
 	router.Get("/{userid:[\\w-]{36}}", userIdHandler)
+	router.Get("/ws", websocketHandler)
 	router.Get("/", homeHandler)
 
 	// Add middlewares

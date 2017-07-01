@@ -47,18 +47,17 @@ section {
     margin: 2px;
     clear: none;
     color: black;
-    opacity: 0.1;
+    opacity: 0.2;
 }
 .button a {
     display: block;
-    color: black;
     padding: 8px 8px;
     text-decoration: none;
 
 }
 .button:hover {
-    background: cornflowerblue;
-    opacity: 0.3;
+    background: gray;
+    opacity: 0.2;
     color: white;
 }
 .minus:before {
