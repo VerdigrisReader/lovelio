@@ -57,14 +57,20 @@ $(document).ready(function() {
     function newBoard(name) {
         Socket.send(JSON.stringify({"type": "newBoard", "body":{"name": name}}))
     }
+    function newBoardItem(name) {
+        Socket.send(JSON.stringify({"type": "newBoardItem", "body": {"boardId": currentBoard, "name": name}}))
+    }
 
     function addMenuItem(name, id) {
-        newItem = $("<li/>")
+        newMenuItem = $("<li/>")
             .addClass("menuitem")
-            .attr("id", id);
+            .attr("id", id)
+            .click(function() {
+                showBoard(this.id)
+            });
         $("<a/>").text(name)
-            .appendTo(newItem)
-        newItem.insertBefore($(".newboard"))
+            .appendTo(newMenuItem)
+        newMenuItem.insertBefore($(".newboard"))
     }
 
     // This sends a ws request which returns 'getBoardItems'
@@ -145,6 +151,27 @@ $(document).ready(function() {
                 mutateItem(this, 'incr')
             })
         }
-    }
+        addRow = $('<div/>')
+            .addClass("row")
+            .appendTo(main);
+        newMinus = $('<div/>')
+            .addClass("button")
+            .appendTo(addRow);
+        button = $("<a/>")
+            .addClass("plus")
+            .click(function() {
+                $(".button > #newItem").toggle();
+                $(".button > #newItem > input").focus();
+            })
+            .appendTo(newMinus);
+        newPopup = $("<div id='newItem' class='popup'><input type='text'></input></div>")
+            .appendTo(newMinus)
+            .keyup(function(event) {
+                if(event.keyCode == 13){
+                    name = $("#newItem > input").val();
+                    newBoardItem(name)
+                    }
+                })
+            }
 }
 )

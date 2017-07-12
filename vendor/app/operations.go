@@ -70,6 +70,11 @@ func NewBoard(conn redis.Conn, useruuid, boardName string) BoardName {
 	return BoardName{boardId, boardName}
 }
 
+func NewBoardItem(conn redis.Conn, boardId, name string) {
+	boardItemsId := stringAppend(boardId, ":items")
+	conn.Send("ZADD", boardItemsId, 0, name)
+}
+
 func getManyBoards(conn redis.Conn, keys ...string) []BoardName {
 	var boards []BoardName
 

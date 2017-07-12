@@ -128,6 +128,14 @@ func websocketHandler(wr http.ResponseWriter, req *http.Request) {
 				boardInfo := app.NewBoard(conn, userId, boardName)
 				var reply = Message{"newBoard", boardInfo}
 				sock.WriteJSON(reply)
+			case "newBoardItem":
+				body, _ := msg.Body.(map[string]interface{})
+				itemName, _ := body["name"].(string)
+				boardId, _ := body["boardId"].(string)
+				app.NewBoardItem(conn, boardId, itemName)
+				boardItems := app.GetBoardItems(conn, boardId)
+				var reply = Message{"getBoardItems", boardItems}
+				sock.WriteJSON(reply)
 			case "getBoardItems":
 				body, _ := msg.Body.(map[string]interface{})
 				boardId, _ := body["boardId"].(string)
